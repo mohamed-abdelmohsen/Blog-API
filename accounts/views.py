@@ -4,6 +4,8 @@ from rest_framework.views import APIView
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from blog.settings import SIMPLE_JWT
 from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer
 from rest_framework.response import Response
 
@@ -68,3 +70,80 @@ class LogoutView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+class LogoutAllView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            tokens = RefreshToken.objects.filter(user=request.user)
+            for token in tokens:   
+
+                token.blacklist()
+            return Response({
+                'message':'Loggedout from all devices'
+            }, status=status.HTTP_205_RESET_CONTENT)
+        except Exception as e :
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+class ChangePasswordView(generics.UpdateAPIView):
+    serializer_class = ChangePasswordSerializer 
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            if not user.check_password(serializer.data.get('old_password')):
+                return Response({
+                    'error':'wrong password'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            user.set_password(serializer.data.get('new_password'))
+            user.save()
+            return Response({
+                'message':'User Updated!'
+            }, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RefreshTokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self,request):
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response({
+                'error':'refresh token required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            refresh = RefreshToken(refresh_token)
+            data = {
+                'access': str(refresh.access_token),
+            }
+            
+            # Rotate refresh tokens if enabled
+            if SIMPLE_JWT.get('ROTATE_REFRESH_TOKENS', False):
+                data['refresh'] = str(refresh)
+            
+            return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        
