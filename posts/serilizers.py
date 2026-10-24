@@ -29,14 +29,14 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = [
-            'id', 'post', 'author', 'parent', 'body', 'is_active', 'created_at', 'updated_at'
+            'id', 'post', 'author', 'parent', 'body', 'is_active', 'created_at', 'updated_at', 'replies'
         ]
         read_only_fields = ['author', 'is_active', 'created_at', 'updated_at']
 
-        def get_repplies(self,obj):
-            if obj.replies.exists():
-                return CommentSerializer(obj.replies.filter(is_active=True), many=True).data
-            return []
+    def get_replies(self,obj):
+        if obj.replies.exists():
+            return CommentSerializer(obj.replies.filter(is_active=True), many=True).data
+        return []
 
         
 class CommentCreateSerializer(serializers.ModelSerializer):
@@ -62,7 +62,7 @@ class PostListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = [
-            "id", "title", "slug", "author", "category", "tags",
+            "id", "title", "slug", "author", "category", "tag",
             "excerpt", "featured_image", "status",
             "created_at", "published_at",
             "views_count", "likes_count", "comments_count",
